@@ -66,6 +66,102 @@ namespace PWDVault
                     Console.WriteLine("Hibás felhasználónév vagy jelszó.");
                 }
             }
+            else if (args[1] == "delete")
+            {
+                // Listázási parancs
+                if (args.Length < 4)
+                {
+                    Console.WriteLine("Hiányzó felhasználónév vagy jelszó.");
+                    return;
+                }
+
+                string username = args[2];
+                string password = args[3];
+
+                // Ellenőrizzük a felhasználói azonosítást
+                if (passwordManager.AuthenticateUser(username, password))
+                {
+                    // Listázzuk a felhasználó jelszavait
+                    passwordManager.DeleteUser(username);
+                }
+                else
+                {
+                    Console.WriteLine("Hibás felhasználónév vagy jelszó.");
+                }
+            }
+            else if (args[1] == "addpassword")
+            {
+                // Listázási parancs
+                if (args.Length < 4)
+                {
+                    Console.WriteLine("Hiányzó felhasználónév vagy jelszó.");
+                    return;
+                }
+
+                string username = args[2];
+                string password = args[3];
+                string newUsername = args[4];
+                string newPassword = args[5];
+                string newWebsite = args[6];
+
+                // Ellenőrizzük a felhasználói azonosítást
+                if (passwordManager.AuthenticateUser(username, password))
+                {
+                    // Listázzuk a felhasználó jelszavait
+                    passwordManager.RegisterPassword(username, newUsername, newPassword, newWebsite);
+                }
+                else
+                {
+                    Console.WriteLine("Hibás felhasználónév vagy jelszó.");
+                }
+            }
+            else if (args[1] == "deletepassword")
+            {
+                // Listázási parancs
+                if (args.Length < 4)
+                {
+                    Console.WriteLine("Hiányzó felhasználónév vagy jelszó.");
+                    return;
+                }
+
+                string username = args[2];
+                string password = args[3];
+                string vaultUsername = args[4];
+
+                // Ellenőrizzük a felhasználói azonosítást
+                if (passwordManager.AuthenticateUser(username, password))
+                {
+                    // Listázzuk a felhasználó jelszavait
+                    passwordManager.DeletePassword(username, vaultUsername);
+                }
+                else
+                {
+                    Console.WriteLine("Hibás felhasználónév vagy jelszó.");
+                }
+            }
+            else if (args[1] == "deletuserpasswords")
+            {
+                // Listázási parancs
+                if (args.Length < 4)
+                {
+                    Console.WriteLine("Hiányzó felhasználónév vagy jelszó.");
+                    return;
+                }
+
+                string username = args[2];
+                string password = args[3];
+
+                // Ellenőrizzük a felhasználói azonosítást
+                if (passwordManager.AuthenticateUser(username, password))
+                {
+                    // Listázzuk a felhasználó jelszavait
+                    passwordManager.DeleteAllPassword(username);
+                }
+                else
+                {
+                    Console.WriteLine("Hibás felhasználónév vagy jelszó.");
+                }
+            }
             else
             {
                 Console.WriteLine("Ismeretlen parancs: " + args[1]);

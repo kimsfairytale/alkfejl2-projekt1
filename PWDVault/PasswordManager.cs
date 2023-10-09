@@ -105,9 +105,7 @@ public class PasswordManager
 
             foreach (var vaultEntry in vaultEntries)
             {
-                // Visszafejthetjük a jelszavakat a felhasználói jelszóval
-                string decryptedPassword = DecryptPassword(vaultEntry.WebPassword, user.PasswordHash);
-                Console.WriteLine($"- {vaultEntry.UserId}: {decryptedPassword}");
+                Console.WriteLine($"- ({vaultEntry.Website}) {vaultEntry.WebUserName}: {vaultEntry.WebPassword}");
             }
         }
         else
@@ -115,6 +113,144 @@ public class PasswordManager
             Console.WriteLine($"{username} nincsenek tárolt jelszavak.");
         }
     }
+
+    public bool DeleteUser(string username)
+    {
+        // Ellenőrizzük, hogy a felhasználó létezik
+        var user = GetUserByUsername(username);
+        if (user == null)
+        {
+            Console.WriteLine("A felhasználó nem található.");
+            return false;
+        }
+
+        // Töröljük a felhasználót a listából
+        List<User> users = ReadUsersFromCsv();
+        users.RemoveAll(u => u.UserName == username);
+
+        // Írjuk felül a users.csv fájlt a frissített felhasználói listával
+        using (var writer = new StreamWriter(usersFilePath, false))
+        using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)))
+        {
+            csv.WriteRecords(users);
+        }
+
+        Console.WriteLine($"A felhasználó '{username}' sikeresen törölve lett.");
+        return true;
+    }
+
+    public bool RegisterPassword(string username, string newUsername, string newPassword, string newWebsite)
+    {
+
+        // Keresse meg a felhasználót a felhasználónevével
+        var user = GetUserByUsername(username);
+        if (user == null)
+        {
+            Console.WriteLine("A felhasználó nem található.");
+            return false;
+        }
+
+        // Generáljuk az új jelszót
+        string encryptedPassword = HashPassword(newPassword);
+
+        // Regisztráljuk az új jelszót a vault.csv fájlban
+        var vaultEntry = new Vault
+        {
+            UserId = user.UserName,
+            WebUserName = newUsername,
+            WebPassword = encryptedPassword,
+            Website = newWebsite
+        };
+
+        using (var writer = new StreamWriter(vaultFilePath, append: true))
+        using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)))
+        {
+            csv.WriteRecord(vaultEntry);
+            csv.NextRecord();
+        }
+
+        Console.WriteLine("Az új jelszó sikeresen regisztrálva lett.");
+        return true;
+    }
+
+    public bool DeletePassword(string username, string vaultUsername)
+    {
+
+        // Keresse meg a felhasználót a felhasználónevével
+        var user = GetUserByUsername(username);
+        if (user == null)
+        {
+            Console.WriteLine("A felhasználó nem található.");
+            return false;
+        }
+
+        // Töröljük a felhasználó jelszavát a vault.csv fájlból
+        List<Vault> vaultEntries = ReadVaultEntriesFromCsv();
+        var entriesToDelete = vaultEntries.Where(ve => ve.WebUserName == vaultUsername).ToList();
+
+        if (entriesToDelete.Any())
+        {
+            foreach (var entryToDelete in entriesToDelete)
+            {
+                vaultEntries.Remove(entryToDelete);
+            }
+
+            // Írjuk felül a vault.csv fájlt a frissített bejegyzésekkel
+            using (var writer = new StreamWriter(vaultFilePath, false))
+            using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)))
+            {
+                csv.WriteRecords(vaultEntries);
+            }
+
+            Console.WriteLine($"A felhasználó '{vaultUsername}' jelszava sikeresen törölve lett.");
+            return true;
+        }
+        else
+        {
+            Console.WriteLine($"A felhasználó '{username}' nem rendelkezik jelszavakkal.");
+            return false;
+        }
+    }
+
+    public bool DeleteAllPassword(string username)
+    {
+
+        // Keresse meg a felhasználót a felhasználónevével
+        var user = GetUserByUsername(username);
+        if (user == null)
+        {
+            Console.WriteLine("A felhasználó nem található.");
+            return false;
+        }
+
+        // Töröljük a felhasználó jelszavát a vault.csv fájlból
+        List<Vault> vaultEntries = ReadVaultEntriesFromCsv();
+        var entriesToDelete = vaultEntries.Where(ve => ve.UserId == user.UserName).ToList();
+
+        if (entriesToDelete.Any())
+        {
+            foreach (var entryToDelete in entriesToDelete)
+            {
+                vaultEntries.Remove(entryToDelete);
+            }
+
+            // Írjuk felül a vault.csv fájlt a frissített bejegyzésekkel
+            using (var writer = new StreamWriter(vaultFilePath, false))
+            using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)))
+            {
+                csv.WriteRecords(vaultEntries);
+            }
+
+            Console.WriteLine($"A felhasználó '{username}' összes jelszava sikeresen törölve lett.");
+            return true;
+        }
+        else
+        {
+            Console.WriteLine($"A felhasználó '{username}' nem rendelkezik jelszavakkal.");
+            return false;
+        }
+    }
+
 
     private bool UserExists(string username)
     {
@@ -142,31 +278,6 @@ public class PasswordManager
     {
         List<Vault> vaultEntries = ReadVaultEntriesFromCsv();
         return vaultEntries.Where(ve => ve.UserId == username).ToList();
-    }
-
-    private string DecryptPassword(string encryptedPassword, string userPasswordHash)
-    {
-        using (Aes aesAlg = Aes.Create())
-        {
-            // Az userPasswordHash értékét használjuk kulcsként
-            aesAlg.Key = Encoding.UTF8.GetBytes(userPasswordHash);
-
-            // Az első 16 byte a IV (Inicializációs Vektor) része
-            byte[] iv = new byte[16];
-            Array.Copy(Encoding.UTF8.GetBytes(encryptedPassword.Substring(0, 16)), iv, 16);
-            aesAlg.IV = iv;
-
-            // A többi rész tartalmazza az enkriptált jelszót
-            byte[] encryptedBytes = Convert.FromBase64String(encryptedPassword.Substring(16));
-
-            using (ICryptoTransform decryptor = aesAlg.CreateDecryptor(aesAlg.Key, aesAlg.IV))
-            using (MemoryStream msDecrypt = new MemoryStream(encryptedBytes))
-            using (CryptoStream csDecrypt = new CryptoStream(msDecrypt, decryptor, CryptoStreamMode.Read))
-            using (StreamReader srDecrypt = new StreamReader(csDecrypt))
-            {
-                return srDecrypt.ReadToEnd();
-            }
-        }
     }
 
     private List<User> ReadUsersFromCsv()
